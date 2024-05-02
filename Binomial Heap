@@ -272,5 +272,5 @@ int main()
     auto stop=chrono::high_resolution_clock::now();
     auto duration=chrono::duration_cast<chrono::milliseconds>(stop-start);
     cout<<duration.count();//1.968 secunde->10^5, val_max=1e6
-    return 0;
+    return 0;              //2.754 secunde->10^6, val_max=1e6
 }
