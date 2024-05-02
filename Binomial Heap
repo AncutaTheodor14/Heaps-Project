@@ -1,0 +1,276 @@
+#include <iostream>
+#include <list>
+#include <cstdlib>
+#include <ctime>
+#include<chrono>
+#define INF 2000000001
+using namespace std;
+
+int N,ok;
+
+struct node{
+    int key, degree, ind;
+    node *child, *sibling, *parent;
+};
+
+node* new_node(int val)
+{
+    node* temp = new node;
+    temp -> key = val;
+    temp -> degree = 0;
+    temp -> child = temp -> sibling = temp -> parent = NULL;
+    return temp;
+}
+
+class binomial_heap{
+    list<node*>H;
+    list<node*>::iterator get_root(int &ok)//returnez nodul cu valoarea cea mai mica get_min (complexitate O(logn)
+    {
+        list<node*>::iterator it, it_max;
+        node* vmax = new_node(INF);
+
+        for(it = H.begin(); it != H.end(); ++it)
+            if((*it) -> key < vmax -> key){
+                ok = 1;
+                vmax = *it;
+                it_max = it;
+            }
+        return it_max;
+    }
+    void delete_root(node* tree, binomial_heap& heap)//sterg radacina arborelui
+    {
+        if(tree -> degree == 0)
+        {
+            delete tree;
+            return;
+        }
+        node* temp = tree;//consider toti copiii nodului radacina si elimin referinta catre tata
+        tree -> child -> parent = NULL;
+        heap.H.push_front(tree -> child);
+        tree = tree -> child;
+        while(tree -> sibling)
+        {
+            tree -> sibling -> parent = NULL;
+            heap.H.push_front(tree -> sibling);
+            tree = tree -> sibling;
+        }
+        delete temp;
+    }
+    void merge_tree(node* tree1, node* tree2)//unesc 2 arbori de aceeasi dimensiune pastrand structura de heap in cadrul arborelui format
+    {
+        if(tree1 -> key > tree2 -> key)
+            swap(*tree1, *tree2);
+
+        tree2 -> sibling = tree1 -> child;
+        tree2 -> parent = tree1;
+        tree1 -> child = tree2;
+        tree1 -> degree++;
+    }
+    void adjust()//ma asigur sa nu am 2 arbori cu acelasi numar de noduri (complexitate logn)
+    {
+        if(H.size() <= 1)
+            return;
+        list <node*> :: iterator prev;
+        list <node*> :: iterator curr;
+        list <node*> :: iterator next;
+        list <node*> :: iterator temp;
+        prev = curr = H.begin();
+        curr++;
+        next = curr;
+        next++;
+        while(curr != H.end())
+        {
+            while((next == H.end() || (*next) -> degree > (*curr) -> degree) && curr != H.end() && (*prev) -> degree == (*curr) -> degree)
+            {
+                merge_tree(*curr, *prev);
+                temp = prev;
+                if(prev == H.begin())
+                {
+                    prev++;
+                    curr++;
+                    if(next != H.end())
+                        next++;
+                }
+                else
+                    prev--;
+                H.erase(temp);
+            }
+            prev++;
+            if(curr != H.end())
+                curr++;
+            if(next != H.end())
+                next++;
+        }
+    }
+public:
+    int top()
+    {
+        ok=0;
+        list<node*> :: iterator ll = get_root(ok);
+        if(ok==0)
+            return -1;
+        return (*ll) -> key;
+    }
+    void push(int val)//insert-ul se face in O(1)
+    {
+        node *tree = new_node(val);
+        H.push_front(tree);
+        /*list<node>::iterator it;
+        for(auto it:H)
+            cout<<it->key<<'\n';*/
+        adjust();
+    }
+    void heap_union(binomial_heap& heap2)
+    {
+        list <node*> :: iterator it1 = H.begin();
+        list <node*> :: iterator it2 = heap2.H.begin();
+        list <node*> new_heap;
+        while(it1 != H.end() && it2 != heap2.H.end())
+        {
+            if((*it1) -> degree <= (*it2) -> degree)
+            {
+                new_heap.push_back(*it1);
+                it1++;
+            }
+            else
+            {
+                new_heap.push_back(*it2);
+                it2++;
+            }
+        }
+        while(it1 != H.end())
+        {
+            new_heap.push_back(*it1);
+            it1++;
+        }
+        while(it2 != heap2.H.end())
+        {
+            new_heap.push_back(*it2);
+            it2++;
+        }
+        heap2.H.clear();
+        H = new_heap;
+        adjust();
+    }
+    void pop()//eliminarea unui nod si reconfigurarea arborilor (complexitate O(logn) )
+    {
+        int ok=0;
+        list <node*> :: iterator root = get_root(ok);
+        binomial_heap new_heap;
+        delete_root((*root), new_heap);
+        H.erase(root);
+        heap_union(new_heap);
+    }
+    bool contains(int x)
+    {
+        for (auto root : H)
+        {
+            if (find_in_tree(root, x))
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+    bool find_in_tree(node* root, int x)
+    {
+        if (root == NULL) return false;
+        if (root->key == x) return true;
+        return find_in_tree(root->child, x) || find_in_tree(root->sibling, x);
+    }
+    int find_max_less_equal(int x)
+    {
+        int max_val = -1;
+        for (auto root : H)
+        {
+            find_in_subtree(root, x, max_val);
+        }
+        return max_val;
+    }
+    void find_in_subtree(node* root, int x, int& max_val)
+    {
+        if (root == NULL) return;
+        if (root->key <= x && root->key > max_val)
+        {
+            max_val = root->key;
+        }
+        find_in_subtree(root->child, x, max_val);
+        find_in_subtree(root->sibling, x, max_val);
+    }
+    int find_min_greater_equal(int x)
+    {
+        int min_val = INF;
+        for (auto root : H)
+        {
+            find_in_subtree_1(root, x, min_val);
+        }
+        return min_val;
+    }
+    void find_in_subtree_1(node* root, int x, int& min_val)
+    {
+        if (root == NULL) return;
+        if (root->key >= x && root->key < min_val)
+        {
+            min_val = root->key;
+        }
+        find_in_subtree_1(root->child, x, min_val);
+        find_in_subtree_1(root->sibling, x, min_val);
+    }
+};
+
+binomial_heap Heap;
+
+int main()
+{
+    int task, x, y, k = 0;
+    N = 1e7;
+    const int max_value = 1e6;
+    std::srand(std::time(nullptr));
+    auto start=chrono::high_resolution_clock::now();
+    for(int i = 1; i <= N; ++i)
+    {
+        task = std::rand() % 5 + 1;
+        if(task == 1)
+        {
+            x = std::rand() % max_value + 1;
+            Heap.push(x);//inserare
+        }
+        else
+        if(task == 2)
+        {
+            int ans = Heap.top();
+            if(ans == -1)
+            {
+                //cout << ans << '\n';
+                continue;
+            }
+            //cout << ans << '\n';//cel mai mic element
+            Heap.pop();//stergere cel mai mic element
+        }
+        else
+        if(task == 3)
+        {
+            x = std::rand() % max_value + 1;
+            //cout<<Heap.contains(x)<<'\n';//verificare element in heap (1 daca e in heap si 0 daca nu e) complexitate O(n)
+            int temp = Heap.contains(x);
+        }
+        else
+        if(task == 4)
+        {
+            x = std::rand() % max_value + 1;
+            //cout << Heap.find_max_less_equal(x) << '\n';//verificare cel mai mare element mai mic sau egal decat x (daca nu exista se afiseaza -1)O(n)
+            int temp = Heap.contains(x);
+        }
+        else
+        if(task == 5)
+        {
+            x = std::rand() % max_value + 1;
+            //cout << Heap.find_min_greater_equal(x) << '\n';//verificare cel mai mic element mai mare sau egal decat x (daca nu exista se afiseaza INF)O(n)
+            int temp = Heap.contains(x);
+        }
+    }
+    auto stop=chrono::high_resolution_clock::now();
+    auto duration=chrono::duration_cast<chrono::milliseconds>(stop-start);
+    cout<<duration.count();//1.968 secunde->10^5, val_max=1e6
+    return 0;
+}
